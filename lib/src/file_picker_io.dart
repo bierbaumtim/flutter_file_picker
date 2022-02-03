@@ -22,6 +22,39 @@ class FilePickerIO extends FilePicker {
   static StreamSubscription? _eventSubscription;
 
   @override
+  Future<String?> saveFile({
+    String? dialogTitle,
+    String? fileName,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    bool lockParentWindow = false,
+  }) async {
+    if (Platform.isIOS) {
+      throw UnimplementedError('');
+    }
+
+    try {
+      final result = await _channel.invokeMethod(
+        'save_file',
+        {
+          'type': type,
+          'allowedExtensions': allowedExtensions,
+          'fileName': fileName,
+        },
+      );
+
+      return result;
+    } on PlatformException catch (e) {
+      print('[$_tag] Platform exception: $e');
+      rethrow;
+    } catch (e) {
+      print(
+          '[$_tag] Unsupported operation. Method not found. The exception thrown was: $e');
+      rethrow;
+    }
+  }
+
+  @override
   Future<FilePickerResult?> pickFiles({
     FileType type = FileType.any,
     List<String>? allowedExtensions,

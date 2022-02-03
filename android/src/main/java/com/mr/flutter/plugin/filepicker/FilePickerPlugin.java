@@ -102,6 +102,7 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
 
     private ActivityPluginBinding activityBinding;
     private FilePickerDelegate delegate;
+    private FileSaverDelegate saverDelegate;
     private Application application;
     private FlutterPluginBinding pluginBinding;
 
@@ -151,6 +152,25 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
 
         if (call.method != null && call.method.equals("clear")) {
             result.success(FileUtils.clearCache(activity.getApplicationContext()));
+            return;
+        }
+
+        if (call.method != null && call.method.equals("save_file")) {
+            String type = (String) arguments.get("type");
+            fileType = FilePickerPlugin.resolveType(type);
+            if (fileType != null){
+                result.notImplemented();
+            } else if(fileType != "dir") {
+                String[] allowedExtensions = FileUtils.getMimeTypes((ArrayList<String>) arguments.get("allowedExtensions"));
+                String fileName = (String) arguments.get("fileName");
+
+                if(type == "custom" && (allowedExtensions == null || allowedExtensions.length == 0)){
+                    result.error(TAG, "Unsupported filter. Make sure that you are only using the extension without the dot, (ie., jpg instead of .jpg). This could also have happened because you are using an unsupported file extension.  If the problem persists, you may want to consider using FileType.all instead.", null);
+                } else {
+                    this.saverDelegate.startFileExplorer(fileType, fileName, allowedExtensions, result);
+                }
+            }
+
             return;
         }
 
@@ -251,6 +271,7 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
         this.activity = activity;
         this.application = application;
         this.delegate = new FilePickerDelegate(activity);
+        this.saverDelegate = new FileSaverDelegate(activity);
         this.channel = new MethodChannel(messenger, CHANNEL);
         this.channel.setMethodCallHandler(this);
         new EventChannel(messenger, EVENT_CHANNEL).setStreamHandler(new EventChannel.StreamHandler() {
@@ -269,10 +290,12 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
             // V1 embedding setup for activity listeners.
             application.registerActivityLifecycleCallbacks(this.observer);
             registrar.addActivityResultListener(this.delegate);
+            registrar.addActivityResultListener(this.saverDelegate);
             registrar.addRequestPermissionsResultListener(this.delegate);
         } else {
             // V2 embedding setup for activity listeners.
             activityBinding.addActivityResultListener(this.delegate);
+            activityBinding.addActivityResultListener(this.saverDelegate);
             activityBinding.addRequestPermissionsResultListener(this.delegate);
             this.lifecycle = FlutterLifecycleAdapter.getActivityLifecycle(activityBinding);
             this.lifecycle.addObserver(this.observer);
@@ -281,6 +304,7 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
 
     private void tearDown() {
         this.activityBinding.removeActivityResultListener(this.delegate);
+        this.activityBinding.removeActivityResultListener(this.saverDelegate);
         this.activityBinding.removeRequestPermissionsResultListener(this.delegate);
         this.activityBinding = null;
         if(this.observer != null) {
@@ -290,6 +314,7 @@ public class FilePickerPlugin implements MethodChannel.MethodCallHandler, Flutte
         this.lifecycle = null;
         this.delegate.setEventHandler(null);
         this.delegate = null;
+        this.saverDelegate = null;
         this.channel.setMethodCallHandler(null);
         this.channel = null;
         this.application = null;
